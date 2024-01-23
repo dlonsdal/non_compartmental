@@ -1,0 +1,313 @@
+---
+title: "Introduction to non-compartmental analysis using '<TT>R</TT>'"
+output:
+  bookdown::html_document2:
+    fig_caption : TRUE
+    number_sections: no
+    toc: yes
+    toc_float: yes
+
+header-includes:
+  - \usepackage{colortbl}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \floatplacement{figure}{H}
+  - \floatplacement{table}{H}
+  - \usepackage{booktabs}
+  - \usepackage{caption}
+  - \captionsetup{labelfont=bf,margin=12pt} 
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
+---
+
+<style>
+h1.title {
+  font-size: 48px;
+
+  text-align: center;
+}
+h1 {
+  font-size: 24px;
+}
+h2 {
+  font-size: 20px;
+}
+h3 {
+  font-size: 16px;
+}
+
+h4.author { 
+  text-align: center;
+}
+body {
+text-align: justify}
+</style>
+
+<center><img src="PK.png"/></center>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.pos= "H")
+library(tidyverse)
+library(kableExtra)
+```
+
+
+# Introduction 
+
+
+In this session, we will build on our knowledge of coding and use '<TT>R</TT>' to estimate some basic pharmacokinetic parameters using what is known as non-compartmental techniques.
+
+# Learning outcomes  
+
+By the end of this week you should be able to:  
+  
+
+* Use  <TT>R</TT> to undertake basic, descriptive (non-compartmental) analysis of some pharmacokinetic data to estimate
+    + $C_{max}$
+    + $T_{max}$
+    + $AUC_{0-t}$
+    + Bioavailability ($F$)
+    
+* Describe the linear trapezoidal method of estimating $AUC$
+    + State one disadvantage of this method
+    + Explain an alternative method that avoids this disadvantage
+    
+
+# Accessing <TT>R</TT> and <TT>RStudio</TT> on a University computer 
+
+The two key tools for this session will be <TT>R</TT> and <TT>RStudio</TT>. These are free, open source pieces of software. They are both available on the University computers, but you may choose to download them onto your personal laptop or home computer.
+
+When you are using a University computer, you need to access <TT>RStudio</TT> via the University servers.
+
+The link for this is [here](https://stats3.sgul.ac.uk/rstudio).  I suggest you save this as a 'favourite'.
+
+Some reminders from last time:
+
+## Setting the working directory
+
+Last session, I recommended that you make a folder on your personal (H:) drive to contain all your work for this module. You will need to remember (or check) what you called it.
+
+You can <TT>setwd()</TT>  using your mouse and clicking on 'session' and 'set working directory'. Alternatively (and more rapidly), you can use <TT>R</TT> code and the <TT>setwd()</TT> function.
+
+<br>
+
+``` {r,eval=FALSE, results='hold', tidy=FALSE}
+  
+setwd()
+setwd("INSERT YOUR FILE PATH HERE")
+# or if on the server setwd("~/your_file_name/sub_folder_if_used/") 
+```
+
+### Packages you need for this session
+
+Link your path using the following line of code and then call <TT>library(tidyverse)</TT>.
+
+```{r, eval=FALSE}
+.libPaths( c( .libPaths(),
+"/homes/dlonsdale-pharmacokinetics/sghms/bms/shares/Advanced-Pharmacokinetics/4.3.2/library") )
+#note that you need the '.' before 'libPaths'
+library(tidyverse)
+```
+
+# Accessing data for this session
+
+For this session we will be using PK data for an anti-epileptic. 6 participants were given an IV dose and then one week later they were given an oral dose. Drug concentrations were measured.
+
+You can download the data for this session directly from GitHub. There are two files. Copy and paste my code.
+
+```{r, eval=TRUE}
+
+IV<-read.csv("https://raw.githubusercontent.com/dlonsdal/non_compartmental/main/docs/PK_IV.csv")
+
+
+ORAL<-read.csv("https://raw.githubusercontent.com/dlonsdal/non_compartmental/main/docs/PK_oral.csv")
+
+```
+
+**Task:** Plot the data for the IV and oral data.
+
+_Hint: Review the [notes](https://dlonsdal.github.io/intro_r_solutions/) from the last session and use some <TT>ggplot()</TT> code_
+
+```{r plot,  message=FALSE, warning=FALSE}
+
+
+ggplot(data=IV,aes(x=time, y=conc,col=id) )+
+  geom_line()+
+  geom_point()+
+  theme_classic()+
+  xlab("time (hours)")+
+  ylab("concentration of IV drug (mg/L)")
+
+```
+
+
+# Estimating $C_{max}$
+
+Remember that $C_{max}$ is observed from our data. We find the max value per participant and report it. We actually did this in the last session. 
+
+**Tasks:** 
+
+* Estimate $C_{max}$ for the IV and oral data
+* Estimate the mean $C_{max}$ for the IV and oral data
+
+_Advanced: Output both IV and oral data together in one table_
+
+```{r cmax_solution, message=FALSE, warning=FALSE}
+IV%>%
+  group_by(id)%>%
+  summarise(cmax=max(conc))
+# here we tell R to take 'IV', group by 'id' then give the max conc
+
+ORAL %>% 
+  group_by(id) %>% 
+  summarise(cmax=max(conc))
+
+IV%>%
+  group_by(id)%>%
+  summarise(cmax=max(conc)) %>% 
+  ungroup() %>% 
+  summarise(mean(cmax))
+# here we tell R to take 'IV', group by 'id' then give the max conc
+
+ORAL %>% 
+  group_by(id) %>% 
+  summarise(cmax=max(conc)) %>% 
+  ungroup() %>% 
+  summarise(mean(cmax))
+
+FULL<-rbind(IV,ORAL)
+FULL %>% 
+  group_by(id,study) %>% 
+  summarise(max(conc))
+
+FULL %>% 
+  group_by(id,study) %>% 
+  summarise(cmax=max(conc),.groups="drop") %>% 
+  group_by(study)  %>% 
+  summarise(mean(cmax))
+
+```
+
+# Estimating $T_{max}$
+
+This is a little more tricky. We need to get <TT>R</TT> to find $C_{max}$ and then keep the associated value for time.
+
+Try a Google search for this. Something like 'using group by to get the value corresponding to the max value of another column'.
+
+**Task:** Estimate $T_{max}$ for the IV and oral data
+
+```{r tmax_solution,   message=FALSE, warning=FALSE}
+
+ORAL %>% 
+  group_by(id) %>% 
+  summarise(cmax=max(conc),
+            tmax=time[which.max(conc)])
+
+FULL %>% 
+  group_by(id,study) %>% 
+  summarise(cmax=max(conc),
+            tmax=time[which.max(conc)],.groups="drop") %>% 
+  group_by(study)  %>% 
+  summarise(mean(cmax),
+            mean(tmax))  
+```
+
+# Estimating the area under the curve ($AUC_{0-t}$)
+
+$AUC_{0-t}$ is the area under the time concentration curve from $time=0$ to $time=t$ ($t$ will usually be the time of the last observed sample but it doesnt have to be). In non-compartmental analysis, this is often estimated using a method that breaks up the time concentration data into small chunks, estimates the area under each chunk and adds them together. The most straightforward way of doing this is using the trapezoid method. 
+
+```{r trap, echo=F, fig.cap="Participant 'A' oral concentration-time profile, with trapezoids indicated in colour", fig.width=7,fig.height=2.5,fig.align = 'center', warning=F,message=F}
+
+soral<-subset(ORAL,id=='A')
+a<-ggplot(data=soral, aes(time,conc))+
+  geom_point()+
+  xlab("Time (hours)") + ylab("Drug concentration (mg/L)")+
+  geom_line() +
+  theme_bw(base_size=9)
+
+b<-ggplot(data=soral, aes(time,conc))+ 
+
+    geom_ribbon(data=subset(soral,  time >2 & time < 7), 
+          aes(ymin=0,ymax=conc),
+              fill='#82B446',
+              alpha=0.2, outline.type = 'full',colour='gray44')+ 
+
+  geom_point()+
+  xlab("Time (hours)") + ylab("Drug concentration (mg/L)")+
+  geom_line() +
+  theme_bw(base_size=9) +
+  geom_text(x=4, y=0, label="A", hjust= -0.25, vjust = 1, size=3)+
+  geom_text(x=4, y=soral$conc[9], label="B",hjust= -0.5,  size=3)+
+  geom_text(x=6, y=soral$conc[10], label="C", hjust= -0.5,vjust=-0.25, size=3)+
+  geom_text(x=6, y=0, label="D", hjust= -0.25, vjust = 1, size=3)
+
+library(gridExtra)
+grid.arrange(a,b,ncol=2)
+```
+
+To calculate the area under the curve of the trapezoid ABCD in Figure \@ref(fig:trap) we use the equation for the area of a trapezoid. $$Area = \frac{1}{2}*(height_{1,AB}+height_{2,CD})*base_{AD}$$
+The two heights correspond to concentrations B and C and the base is the distance A to D (the change in time $\Delta t$) in Figure \@ref(fig:trap). So more fully for this example, where *height* is replaced with *concentration* $(C)$: $$AUC_{0-8} = \sum_{t=0}^{t=8} \Delta t\frac{(C_1+C_2)}{2}$$ 
+
+Fortunately,<TT>R</TT> has an inbuilt function that allows us to calculate the $AUC$. The handily named <TT>AUC()</TT> function. You need to provide it with three commands, <TT>x=...,y=...</TT> and <TT>method="trapezoid"</TT>. It is in the <TT>DescTools</TT> library.
+
+I will show you how to calculate using the oral data. 
+
+```{r AUC,   message=FALSE, warning=FALSE}
+library(DescTools)
+ORAL%>% 
+  group_by(id) %>% 
+  summarise(AUC=AUC(time,conc,method='trapezoid'))
+
+```
+
+**Tasks:**
+
+* Calculate $AUC$ for the IV data
+* Calculate mean $AUC$ for each dataset
+* Estimate the bioavailability ($F$) of the drug
+
+```{r AUC_solutions, message=FALSE, warning=FALSE}
+IV%>% 
+  group_by(id) %>% 
+  summarise(AUC=AUC(time,conc,method='trapezoid'))
+
+FULL %>% 
+  group_by(id,study) %>% 
+  summarise(AUC=AUC(time,conc,method='trapezoid')) %>% 
+  group_by(study)  %>% 
+  summarise(mAUC=
+              mean(AUC)) 
+
+FULL %>% 
+  group_by(id,study) %>% 
+  summarise(AUC=AUC(time,conc,method='trapezoid')) %>% 
+  group_by(study)  %>% 
+  summarise(mAUC=
+              mean(AUC)) %>% 
+  summarise(F=mAUC[study=="ORAL"]/mAUC[study=="IV"])
+
+
+```
+
+
+## Limitations of the linear trapezoid method 
+
+```{r trapbest, echo=F, fig.cap="Participant 'A' IV concentration-time profile with curved line of best fit", fig.width=4.5,fig.height=2.5,fig.align = 'center'}
+sIV<-subset(IV,id=="A"&time>4)
+ggplot(data=sIV, aes(time,conc))+ 
+    geom_ribbon(data=subset(sIV,  time >11 & time < 25), 
+          aes(ymin=0,ymax=conc),
+              fill='#82B446',
+              alpha=0.2, outline.type = 'full',colour='gray44')+ 
+
+  geom_point()+
+  xlab("Time (hours)") + ylab("Drug concentration (mg/L)")+
+  geom_line()+ 
+
+  geom_line()  +
+  geom_function(fun=function(x) (1000/27.75)*exp((-0.17)*x),linetype='twodash', col='red')+
+  labs(caption = "Line of best fit shown in red")
+
+```
+
+It is worth noting the trapezoid method has limitations. Most notably that it will *overestimate* $AUC$ by virtue of taking a straight line between points, when the true concentration will fall in an logarithmic (curve) fashion (Figure \@ref(fig:trapbest)). There are methods to improve this accuracy, such as the logarithmic trapezoidal method. With this method, the 'trapezoid' is given a curved top (like the red line in Figure \@ref(fig:trapbest)). The formula for this method is $$AUC = \sum_{t=0}^{t=\tau} \frac{\Delta t}{ln(\frac{C_1}{C_2})} (C_1+C_2)$$  
