@@ -104,7 +104,7 @@ Link your path using the following line of code and then call <TT>library(tidyve
 
 ```{r, eval=FALSE}
 .libPaths( c( .libPaths(),
-              "/homes/dlonsdale-pharmacokinetics/sghms/bms/shares/Advanced-Pharmacokinetics/4.3.2/library") )
+              "/homes/dlonsdale-pharmacokinetics/sghms/bms/shares/Advanced-Pharmacokinetics/4.4.2/library") )
 #note that you need the '.' before 'libPaths'
 library(tidyverse)
 ```
